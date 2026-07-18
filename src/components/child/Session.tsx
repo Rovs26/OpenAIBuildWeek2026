@@ -1,10 +1,18 @@
 "use client";
 
+// The adaptive session state machine:
+//   items (×MAX) → speaking → celebration
+// Every answer is persisted so a killed tab resumes at the same stop
+// (ARCHITECTURE §3). ZERO network fetches inside the item loop — that is what
+// makes the airplane-mode demo survive. CAT and the item bank are local,
+// deterministic P2 modules; sync and speaking fail softly when unavailable.
+
 import { useEffect, useRef, useState } from "react";
 import type { Item, ItemResponse, SessionResult, SpeakingResult } from "@/lib/types";
 import SpeakingSection from "@/components/speaking/SpeakingSection";
 import { syncResult } from "@/lib/resultSync";
-import { estimate, itemPool, levelBand, nextItem } from "./mocks";
+import { estimate, levelBand, nextItem } from "@/lib/cat";
+import { itemBank as itemPool } from "@/lib/itemBank";
 import ItemScreen from "./ItemScreen";
 import JourneyBar from "./JourneyBar";
 import CelebrationScreen from "./CelebrationScreen";
@@ -88,7 +96,7 @@ export default function Session({
     }
     const item = nextItem(itemPool, next);
     if (!item) {
-      setPhase("speaking");
+      setPhase("speaking"); // local item bank exhausted → graceful finish
       return;
     }
     setCurrent(item);
