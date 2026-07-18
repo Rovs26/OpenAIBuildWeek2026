@@ -5,14 +5,16 @@
 // required, no menu. See tasks/P1.md §A2.
 
 import { useState } from "react";
-import { unlockAudio } from "@/components/child/useAudio";
+import { unlockAudio, useAudio } from "@/components/child/useAudio";
 import Session from "@/components/child/Session";
 
 export default function ChildPage() {
   const [started, setStarted] = useState(false);
+  const { playSfx } = useAudio();
 
   function start() {
     unlockAudio(); // must run inside the tap gesture — nothing plays before this
+    playSfx("tap"); // playful entry cue
     setStarted(true);
   }
 

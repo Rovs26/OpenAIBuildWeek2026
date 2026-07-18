@@ -1,0 +1,180 @@
+{
+  "project": {
+    "name": "PROJECT_NAME",
+    "version": "1.0.0",
+    "environment": "development"
+  },
+
+  "security": {
+    "apiKeys": {
+      "allow": ["ANTHROPIC_API_KEY"],
+      "deny": ["*_SECRET", "*_PASSWORD"],
+      "source": "environment_only",
+      "exposeInLogs": false,
+      "rotationDays": 90
+    },
+    "authentication": {
+      "requireAuth": true,
+      "sessionTimeout": 3600,
+      "allowLocalhost": true,
+      "deniedHosts": ["*internal-staging*", "*test-server*"]
+    },
+    "dataProtection": {
+      "encryptSensitiveFields": true,
+      "allowedDataTypes": ["user_id", "project_id", "timestamps"],
+      "deniedDataTypes": ["credit_card", "ssn", "auth_tokens", "passwords"],
+      "logSensitiveData": false,
+      "redactPatterns": ["(?<=[0-9]{12})[0-9]{4}", "password\\s*=\\s*[^\\s]+"]
+    }
+  },
+
+  "performance": {
+    "caching": {
+      "enable": true,
+      "ttl": 300,
+      "maxSize": "100MB",
+      "allowLocal": true,
+      "denyRemote": false
+    },
+    "api": {
+      "timeout": 30000,
+      "retries": 3,
+      "rateLimitBuffer": 0.8,
+      "batchRequests": true,
+      "maxConcurrency": 5
+    },
+    "logging": {
+      "level": "info",
+      "allowLevels": ["error", "warn", "info"],
+      "denyLevels": ["debug", "trace"],
+      "outputFormats": ["json", "structured"],
+      "maxLogSize": "50MB",
+      "archiveOldLogs": true,
+      "retentionDays": 30
+    }
+  },
+
+  "development": {
+    "debugging": {
+      "enable": true,
+      "allowStackTraces": true,
+      "showVariableValues": true,
+      "deniedVariables": ["*SECRET*", "*TOKEN*", "*PASSWORD*"]
+    },
+    "hotReload": {
+      "enable": true,
+      "watchPatterns": ["src/**/*.js", "src/**/*.json"],
+      "ignorePatterns": ["node_modules", "dist", ".git", "*.log"]
+    },
+    "mockData": {
+      "useMocks": false,
+      "allowMockEndpoints": ["http://localhost:8000"],
+      "denyProductionMocks": true
+    }
+  },
+
+  "integrations": {
+    "allowed": {
+      "services": ["Anthropic API", "OpenAI", "Local Storage"],
+      "protocols": ["https", "http://localhost"],
+      "externalApis": true
+    },
+    "denied": {
+      "services": ["Unauthorized Third-party Analytics", "Deprecated Vendors"],
+      "protocols": ["ftp", "telnet"],
+      "externalApis": ["untrusted-api.com"]
+    },
+    "retry": {
+      "maxAttempts": 3,
+      "backoffMultiplier": 2,
+      "initialDelay": 1000
+    }
+  },
+
+  "fileSystem": {
+    "allowedPaths": [
+      "./src",
+      "./config",
+      "./data",
+      "./templates",
+      "/tmp/project-cache"
+    ],
+    "deniedPaths": [
+      "/etc/passwd",
+      "/root",
+      "~/.ssh",
+      "../../../",
+      "/proc",
+      ".env",
+      ".env.local",
+      ".env.prod",
+      ".env.staging",
+      ".env.*"
+    ],
+    "allowedExtensions": [".js", ".json", ".txt", ".md", ".csv"],
+    "deniedExtensions": [".exe", ".sh", ".bat", ".dll", ".env"],
+    "maxFileSize": "10MB"
+  },
+
+  "environment": {
+    "allowedVars": [
+      "NODE_ENV",
+      "ANTHROPIC_API_KEY",
+      "PROJECT_ID",
+      "LOG_LEVEL",
+      "PORT"
+    ],
+    "deniedVars": [
+      "AWS_SECRET_ACCESS_KEY",
+      "DATABASE_PASSWORD",
+      "PRIVATE_KEY"
+    ],
+    "defaults": {
+      "NODE_ENV": "development",
+      "LOG_LEVEL": "info",
+      "PORT": 3000,
+      "API_TIMEOUT": 30000
+    }
+  },
+
+  "compliance": {
+    "auditLogging": {
+      "enable": true,
+      "logApiCalls": true,
+      "logDataAccess": true,
+      "logFailedAuth": true,
+      "denyPiiLogging": true
+    },
+    "dataRetention": {
+      "logsRetention": "30 days",
+      "cacheRetention": "7 days",
+      "auditRetention": "90 days"
+    }
+  },
+
+  "features": {
+    "enabled": [
+      "api-integration",
+      "local-caching",
+      "error-tracking",
+      "performance-monitoring"
+    ],
+    "disabled": [
+      "experimental-features",
+      "analytics-collection",
+      "deprecated-endpoints"
+    ],
+    "featureFlags": {
+      "betaFeatures": false,
+      "newUI": false,
+      "extendedLogging": false
+    }
+  },
+
+  "notifications": {
+    "allow": ["error_alerts", "rate_limit_warnings", "success_confirmations"],
+    "deny": ["marketing", "unsolicited_updates"],
+    "channels": ["console", "file"],
+    "denyChannels": ["email", "push"]
+  }
+}

@@ -26,7 +26,7 @@ export default function ItemScreen({
   item: Item;
   onAnswer: (choiceId: string, ms: number) => void;
 }) {
-  const { play, replay } = useAudio();
+  const { play, speak, playSfx } = useAudio();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [phrase, setPhrase] = useState("");
   const startRef = useRef<number>(0);
@@ -34,12 +34,20 @@ export default function ItemScreen({
 
   const isHear = item.format === "hear-word" || item.format === "hear-sentence";
 
-  // New item: reset, autoplay prompt audio for hear-* (post-unlock), start clock.
+  // Voice the prompt: pre-rendered file if present (P2), else ElevenLabs TTS.
+  // TTS is multilingual, so `fil` prompts come out Filipino.
+  const announce = () => {
+    if (item.audioUrl) void play(item.audioUrl);
+    else void speak(item.prompt, item.language);
+  };
+
+  // New item: reset, autoplay prompt for hear-* (post-unlock), start clock.
+  // see-word stays silent (it's a reading item) but the 🔊 button can voice it.
   useEffect(() => {
     setSelectedId(null);
     setPhrase("");
     startRef.current = performance.now();
-    if (isHear) void play(item.audioUrl);
+    if (isHear) announce();
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
@@ -50,6 +58,7 @@ export default function ItemScreen({
     if (selectedId) return; // one answer per item
     const ms = Math.round(performance.now() - startRef.current);
     setSelectedId(choiceId);
+    playSfx(choiceId === item.correctChoiceId ? "correct" : "wrong");
     setPhrase(WARM_PHRASES[Math.floor(Math.random() * WARM_PHRASES.length)]);
     timerRef.current = setTimeout(() => onAnswer(choiceId, ms), FEEDBACK_MS);
   }
@@ -107,9 +116,9 @@ export default function ItemScreen({
         </div>
       )}
 
-      {/* Persistent replay button (≥ 64 px) */}
+      {/* Persistent replay button (≥ 64 px) — re-voices the current prompt */}
       <button
-        onClick={() => void replay()}
+        onClick={announce}
         className="absolute bottom-5 right-5 flex h-16 w-16 items-center justify-center rounded-full bg-white text-3xl shadow-lg active:scale-95"
         aria-label="Play again"
       >

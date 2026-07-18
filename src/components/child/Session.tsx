@@ -50,7 +50,7 @@ function levelFromDifficulty(item: Item | null): 0 | 1 | 2 | 3 | 4 {
 }
 
 export default function Session() {
-  const { preload } = useAudio();
+  const { preload, preloadSpeak, preloadSfx } = useAudio();
   const [responses, setResponses] = useState<ItemResponse[]>([]);
   const [current, setCurrent] = useState<Item | null>(null);
   const [phase, setPhase] = useState<Phase>("items");
@@ -80,11 +80,14 @@ export default function Session() {
     }
     setCurrent(item);
     setPhase("items");
-    preload(item.audioUrl); // decode ahead so tap → next prompt < 300 ms
+    // Decode the next prompt ahead so tap → next prompt stays < 300 ms.
+    if (item.audioUrl) preload(item.audioUrl);
+    else preloadSpeak(item.prompt, item.language);
   }
 
-  // Mount: resume prior session if one exists, else start fresh.
+  // Mount: warm the answer SFX, then resume prior session or start fresh.
   useEffect(() => {
+    preloadSfx();
     const saved = loadSaved();
     if (saved) {
       startedAtRef.current = saved.startedAt;
