@@ -9,8 +9,6 @@ import type {
   Item,
   ItemResponse,
   LevelBand,
-  SessionResult,
-  SpeakingResult,
 } from "@/lib/types";
 import { mockItems } from "@/lib/mockItems";
 
@@ -57,53 +55,3 @@ export function levelBand(theta: number): LevelBand {
 // ── Item pool (P2 → src/lib/itemBank.ts) ────────────────────────────────────
 // SWAP: import { itemBank as itemPool } from "@/lib/itemBank"  (P2, ~1:10)
 export const itemPool: Item[] = mockItems;
-
-// ── Results sync (P3 → src/lib/resultSync.ts) ───────────────────────────────
-// SWAP: import { syncResult } from "@/lib/resultSync"  (P3, ~1:00)
-export async function syncResult(result: SessionResult): Promise<void> {
-  // Fire-and-forget on the child path — MUST never throw (RULES §6).
-  try {
-    console.log("[syncResult mock] SessionResult:", result);
-  } catch {
-    /* fail soft */
-  }
-}
-
-// ── Speaking section (P4 → src/components/speaking/SpeakingSection) ──────────
-const CANNED_SPEAKING: SpeakingResult = {
-  targetText: "The sun is up.",
-  transcript: "the sun is up",
-  wordMatchPct: 92,
-  audioUrl: "",
-};
-
-// SWAP: import { SpeakingSection } from "@/components/speaking/SpeakingSection" (P4)
-// Contract: onDone(result) on completion, onDone(undefined) on skip/failure.
-export function MockSpeakingSection({
-  onDone,
-}: {
-  onDone: (speaking: SpeakingResult | undefined) => void;
-}) {
-  return (
-    <div className="flex min-h-dvh flex-col items-center justify-center gap-8 bg-violet-100 p-6 text-center text-slate-800">
-      <div className="text-8xl">🦉</div>
-      <p className="text-2xl font-bold">Now YOU read to me!</p>
-      <p className="rounded-3xl bg-white px-6 py-4 text-4xl font-extrabold shadow">
-        {CANNED_SPEAKING.targetText}
-      </p>
-      <button
-        onClick={() => onDone(CANNED_SPEAKING)}
-        className="flex min-h-[96px] min-w-[96px] items-center justify-center rounded-full bg-rose-500 p-6 text-6xl text-white shadow-lg active:scale-95"
-        aria-label="Read aloud"
-      >
-        🎤
-      </button>
-      <button
-        onClick={() => onDone(undefined)}
-        className="min-h-[64px] rounded-2xl px-6 py-3 text-lg font-semibold text-slate-500 active:scale-95"
-      >
-        Skip for now →
-      </button>
-    </div>
-  );
-}
