@@ -17,7 +17,7 @@ const AVATARS = [
 type Stage = "avatar" | "warmup" | "session";
 
 export default function ChildPage() {
-  const { play } = useAudio();
+  const { playPrompt } = useAudio();
   const [stage, setStage] = useState<Stage>("avatar");
   const [avatarKey, setAvatarKey] = useState<string | null>(null);
   const avatar = AVATARS.find((option) => option.key === avatarKey);
@@ -55,7 +55,7 @@ export default function ChildPage() {
           </div>
           <button
             type="button"
-            onClick={() => void play(undefined, { text: "Makinig, tumingin, at piliin ang sagot.", language: "fil" })}
+            onClick={() => void playPrompt({ text: "Makinig, tumingin, at piliin ang sagot.", language: "fil" })}
             className="flex min-h-16 items-center gap-3 rounded-full border-[3px] border-[#FB8500]/35 bg-white px-6 font-display text-lg font-bold text-[#FB8500] shadow-[0_8px_18px_rgba(180,140,60,.16)] active:scale-95"
           >
             <span className="grid h-11 w-11 place-items-center rounded-full bg-[#FB8500] text-2xl text-white" aria-hidden="true">🔊</span>

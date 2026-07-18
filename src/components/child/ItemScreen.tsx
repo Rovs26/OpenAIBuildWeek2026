@@ -23,25 +23,33 @@ export default function ItemScreen({
   item: Item;
   onAnswer: (choiceId: string, ms: number) => void;
 }) {
-  const { play, replay } = useAudio();
+  const { playPrompt, replay } = useAudio();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [phrase, setPhrase] = useState("");
   const startRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isHear = item.format !== "see-word";
-
+  // New item: reset, voice a prompt (post-unlock), start clock. A see-word item
+  // must never read the displayed word aloud; it measures decoding, so it only
+  // gets a language-matched instruction that replay can safely repeat.
   useEffect(() => {
     setSelectedId(null);
     setPhrase("");
     startRef.current = performance.now();
-    if (isHear) {
-      void play(item.audioUrl, { text: item.prompt, language: item.language });
-    }
+    void playPrompt({
+      url: item.format === "see-word" ? undefined : item.audioUrl,
+      text:
+        item.format === "see-word"
+          ? item.language === "fil"
+            ? "Pindutin ang larawang tugma sa salita!"
+            : "Tap the picture that matches the word!"
+          : item.prompt,
+      language: item.language,
+    });
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [item.id]);
+  }, [item, playPrompt]);
 
   function handlePick(choiceId: string) {
     if (selectedId) return;
@@ -111,10 +119,10 @@ export default function ItemScreen({
       {item.format === "see-word" ? (
         <button
           type="button"
-          onClick={() => void play(undefined, { text: item.prompt, language: item.language })}
+          onClick={() => void replay()}
           className="flex min-h-16 items-center gap-2 rounded-full bg-white px-5 font-display text-base font-bold text-[#FB8500] shadow-[0_6px_14px_rgba(180,140,60,.14)] active:scale-95"
         >
-          <span className="text-2xl" aria-hidden="true">🔊</span> Pakinggan ang salita
+          <span className="text-2xl" aria-hidden="true">🔊</span> Pakinggan ang panuto
         </button>
       ) : null}
     </section>

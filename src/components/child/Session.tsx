@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Item, ItemResponse, SessionResult, SpeakingResult } from "@/lib/types";
-import { syncResult } from "@/lib/resultSync";
 import SpeakingSection from "@/components/speaking/SpeakingSection";
+import { syncResult } from "@/lib/resultSync";
 import { estimate, itemPool, levelBand, nextItem } from "./mocks";
 import ItemScreen from "./ItemScreen";
 import JourneyBar from "./JourneyBar";
@@ -14,6 +14,10 @@ import { useAudio } from "./useAudio";
 const MAX_ITEMS = 15;
 const TOTAL_STOPS = Math.min(MAX_ITEMS, itemPool.length) + 2;
 const STORAGE_KEY = "session-in-progress";
+const SPEAKING_TARGETS = {
+  en: "The dog runs.",
+  fil: "Tumakbo ang aso.",
+} as const;
 
 type Phase = "items" | "speaking" | "celebration";
 type Saved = { v: 1; startedAt: number; responses: ItemResponse[] };
@@ -35,6 +39,11 @@ function challengeFromDifficulty(item: Item | null): 0 | 1 | 2 | 3 | 4 {
   return Math.max(0, Math.min(4, value)) as 0 | 1 | 2 | 3 | 4;
 }
 
+function sessionLanguage(responses: ItemResponse[]): "en" | "fil" {
+  const lastResponse = responses[responses.length - 1];
+  return itemPool.find((item) => item.id === lastResponse?.itemId)?.language ?? "en";
+}
+
 export default function Session({
   avatarEmoji,
   studentName,
@@ -49,6 +58,7 @@ export default function Session({
   const [current, setCurrent] = useState<Item | null>(null);
   const [phase, setPhase] = useState<Phase>("items");
   const [online, setOnline] = useState(true);
+  const [learnerName, setLearnerName] = useState(studentName);
   const startedAtRef = useRef(Date.now());
 
   useEffect(() => {
@@ -87,6 +97,9 @@ export default function Session({
   }
 
   useEffect(() => {
+    const name = new URLSearchParams(window.location.search).get("name")?.trim();
+    if (name) setLearnerName(name);
+
     const saved = loadSaved();
     if (saved) {
       startedAtRef.current = saved.startedAt;
@@ -111,14 +124,17 @@ export default function Session({
   function finish(speaking: SpeakingResult | undefined) {
     const { theta, standardError } = estimate(itemPool, responses);
     const result: SessionResult = {
-      studentName,
+      studentName: learnerName,
       theta,
       standardError,
       responses,
       speaking,
       levelBand: levelBand(theta),
     };
-    void syncResult(result);
+    void syncResult({
+      ...result,
+      speaking: speaking ? { ...speaking, audioUrl: "" } : undefined,
+    });
     try {
       localStorage.removeItem(STORAGE_KEY);
     } catch {
@@ -128,12 +144,13 @@ export default function Session({
   }
 
   if (phase === "speaking") {
+    const language = sessionLanguage(responses);
     return (
       <main className="min-h-dvh bg-[#FFF8EB] text-[#126E82]">
         <div className="mx-auto min-h-dvh w-full max-w-[430px]">
           <SpeakingSection
-            language="fil"
-            targetText="Ang araw ay maganda."
+            language={language}
+            targetText={SPEAKING_TARGETS[language]}
             onDone={finish}
           />
         </div>
@@ -145,7 +162,7 @@ export default function Session({
     return (
       <CelebrationScreen
         avatarEmoji={avatarEmoji}
-        childName={studentName}
+        childName={learnerName}
         onDone={onRestart}
       />
     );
