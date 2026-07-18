@@ -1,5 +1,24 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { after, before, test } from "node:test";
+import { fileURLToPath } from "node:url";
+import ts from "typescript";
+
+const testDirectory = path.dirname(fileURLToPath(import.meta.url));
+
+async function importTypeScript(relativePath) {
+  const source = await readFile(path.resolve(testDirectory, relativePath), "utf8");
+  const emitted = ts.transpileModule(source, {
+    compilerOptions: {
+      target: ts.ScriptTarget.ES2020,
+      module: ts.ModuleKind.ESNext,
+      importsNotUsedAsValues: ts.ImportsNotUsedAsValues.Remove,
+    },
+  }).outputText;
+  const url = `data:text/javascript;base64,${Buffer.from(emitted).toString("base64")}`;
+  return import(url);
+}
 
 class MemoryStorage {
   #values = new Map();
@@ -46,7 +65,7 @@ function pendingResults() {
 before(async () => {
   globalThis.window = { localStorage: storage };
   console.warn = () => {};
-  ({ retryPendingResults, syncResult } = await import("../../../lib/resultSync.ts"));
+  ({ retryPendingResults, syncResult } = await importTypeScript("../../../lib/resultSync.ts"));
 });
 
 after(() => {

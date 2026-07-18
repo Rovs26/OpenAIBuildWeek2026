@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
+import { readFile } from "node:fs/promises";
 import net from "node:net";
 import path from "node:path";
 import { after, before, test } from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
+import ts from "typescript";
 
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(testDirectory, "../../../..");
@@ -21,6 +23,29 @@ const nextBinary = path.join(
 let serverProcess;
 let serverOutput = "";
 let baseUrl;
+let itemBank;
+let estimate;
+let levelBand;
+
+async function importTypeScript(relativePath) {
+  const source = await readFile(path.join(projectRoot, relativePath), "utf8");
+  const emitted = ts.transpileModule(source, {
+    compilerOptions: {
+      target: ts.ScriptTarget.ES2020,
+      module: ts.ModuleKind.ESNext,
+      importsNotUsedAsValues: ts.ImportsNotUsedAsValues.Remove,
+    },
+  }).outputText;
+  const url = `data:text/javascript;base64,${Buffer.from(emitted).toString("base64")}`;
+  return import(url);
+}
+
+function answerFor(item, correct, index) {
+  const choice = correct
+    ? item.correctChoiceId
+    : item.choices.find((candidate) => candidate.id !== item.correctChoiceId)?.id;
+  return { itemId: item.id, choiceId: choice, correct, ms: 800 + index * 100 };
+}
 
 async function getFreePort() {
   const probe = net.createServer();
@@ -56,6 +81,8 @@ async function waitForServer(url) {
 }
 
 before(async () => {
+  ({ itemBank } = await importTypeScript("src/lib/itemBank.ts"));
+  ({ estimate, levelBand } = await importTypeScript("src/lib/cat.ts"));
   const port = await getFreePort();
   baseUrl = `http://127.0.0.1:${port}`;
   serverProcess = spawn(
@@ -113,6 +140,8 @@ test("serves the teacher dashboard and installable PWA assets", async () => {
   const workerSource = await serviceWorker.text();
   assert.match(workerSource, /CACHE_VERSION/);
   assert.match(workerSource, /"\/child"/);
+  assert.match(workerSource, /audio-manifest\.json/);
+  assert.match(workerSource, /precacheAssessmentAudio/);
   assert.match(workerSource, /url\.pathname\.startsWith\("\/audio\/"\)/);
   assert.match(workerSource, /cacheFirst\(request\)/);
   assert.match(workerSource, /networkFirst\(request\)/);
@@ -142,17 +171,14 @@ test("rejects malformed and incomplete result submissions", async () => {
   assert.deepEqual(await incomplete.json(), { error: "Invalid session result." });
 });
 
-test("recomputes ability on the server and ignores submitted scores", async () => {
+test("matches the client CAT estimate and band for a fixed response sequence", async () => {
+  const responses = itemBank.slice(0, 5).map((item, index) => answerFor(item, true, index));
+  const expected = estimate(itemBank, responses);
   const submitted = {
     studentName: "P3 Test Learner",
     theta: -3,
     standardError: 9,
-    responses: [
-      { itemId: "one", choiceId: "a", correct: true, ms: 800 },
-      { itemId: "two", choiceId: "b", correct: true, ms: 900 },
-      { itemId: "three", choiceId: "c", correct: true, ms: 1_000 },
-      { itemId: "four", choiceId: "d", correct: true, ms: 1_100 },
-    ],
+    responses,
     levelBand: "Emerging",
   };
 
@@ -164,9 +190,29 @@ test("recomputes ability on the server and ignores submitted scores", async () =
 
   assert.equal(response.status, 201);
   const stored = await response.json();
-  assert.equal(stored.theta, 2);
-  assert.equal(stored.standardError, 0.5);
-  assert.equal(stored.levelBand, "On Track");
+  assert.equal(stored.theta, expected.theta);
+  assert.equal(stored.standardError, expected.standardError);
+  assert.equal(stored.levelBand, levelBand(expected.theta));
+});
+
+test("rejects unknown item IDs instead of estimating from a misleading pool", async () => {
+  const submitted = {
+    studentName: "Unknown Item Learner",
+    theta: 0,
+    standardError: 1,
+    responses: [{ itemId: "not-in-p2-bank", choiceId: "a", correct: true, ms: 800 }],
+    levelBand: "Developing",
+  };
+  const response = await fetch(`${baseUrl}/api/results`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(submitted),
+  });
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), {
+    error: "Unknown assessment item IDs.",
+    itemIds: ["not-in-p2-bank"],
+  });
 });
 
 test("upserts results case-insensitively by student name", async () => {
@@ -174,9 +220,7 @@ test("upserts results case-insensitively by student name", async () => {
     studentName: "  p3 test learner  ",
     theta: 3,
     standardError: 0.1,
-    responses: [
-      { itemId: "one", choiceId: "wrong", correct: false, ms: 1_300 },
-    ],
+    responses: [answerFor(itemBank[1], false, 0)],
     levelBand: "On Track",
   };
 
@@ -196,9 +240,10 @@ test("upserts results case-insensitively by student name", async () => {
     (result) => result.studentName.toLowerCase() === "p3 test learner",
   );
   assert.equal(matching.length, 1);
-  assert.equal(matching[0].theta, -2);
-  assert.equal(matching[0].standardError, 1);
-  assert.equal(matching[0].levelBand, "Emerging");
+  const expected = estimate(itemBank, replacement.responses);
+  assert.equal(matching[0].theta, expected.theta);
+  assert.equal(matching[0].standardError, expected.standardError);
+  assert.equal(matching[0].levelBand, levelBand(expected.theta));
 });
 
 test("returns a reassessed learner first", async () => {
@@ -206,7 +251,7 @@ test("returns a reassessed learner first", async () => {
     studentName,
     theta: 0,
     standardError: 1,
-    responses: [{ itemId: "one", choiceId: "a", correct, ms: 800 }],
+    responses: [answerFor(itemBank[2], correct, 0)],
     levelBand: "Developing",
   });
 
