@@ -9,7 +9,12 @@ import { useCallback } from "react";
 
 let ctx: AudioContext | null = null;
 const bufferCache = new Map<string, AudioBuffer>();
-let lastUrl: string | undefined;
+type Prompt = {
+  url?: string;
+  text: string;
+  language: "en" | "fil";
+};
+let lastPrompt: Prompt | null = null;
 
 function getCtx(): AudioContext | null {
   if (ctx) return ctx;
@@ -30,16 +35,30 @@ function getCtx(): AudioContext | null {
  */
 export function unlockAudio(): void {
   const c = getCtx();
-  if (!c) return;
-  if (c.state === "suspended") void c.resume();
-  try {
-    const buf = c.createBuffer(1, 1, 22050);
-    const src = c.createBufferSource();
-    src.buffer = buf;
-    src.connect(c.destination);
-    src.start(0);
-  } catch {
-    /* fail soft */
+  if (c) {
+    if (c.state === "suspended") void c.resume();
+    try {
+      const buf = c.createBuffer(1, 1, 22050);
+      const src = c.createBufferSource();
+      src.buffer = buf;
+      src.connect(c.destination);
+      src.start(0);
+    } catch {
+      /* fail soft */
+    }
+  }
+
+  // Prime the browser voice while this user gesture is still active. This keeps
+  // the text fallback reliable on mobile browsers when the first item mounts.
+  if (typeof window !== "undefined" && "speechSynthesis" in window) {
+    try {
+      window.speechSynthesis.resume();
+      const silent = new SpeechSynthesisUtterance("");
+      silent.volume = 0;
+      window.speechSynthesis.speak(silent);
+    } catch {
+      /* fail soft */
+    }
   }
 }
 
@@ -61,13 +80,13 @@ async function loadBuffer(url: string): Promise<AudioBuffer | null> {
 }
 
 export function useAudio() {
-  // Play a prompt; resolves when playback ends (or immediately if unavailable).
-  const play = useCallback(async (url?: string): Promise<void> => {
-    if (url) lastUrl = url;
+  // Prefer pre-rendered clips. The current demo pool deliberately has none, so
+  // use the browser voice as a fail-soft local fallback until P2 audio lands.
+  const playClip = useCallback(async (url?: string): Promise<boolean> => {
     const c = getCtx();
-    if (!url || !c) return; // fail soft — mockItems have no audioUrl yet
+    if (!url || !c) return false;
     const buf = await loadBuffer(url);
-    if (!buf) return; // fail soft
+    if (!buf) return false;
     await new Promise<void>((resolve) => {
       try {
         const src = c.createBufferSource();
@@ -79,15 +98,51 @@ export function useAudio() {
         resolve();
       }
     });
+    return true;
   }, []);
 
-  // Replay the current prompt (bound to the 🔊 button).
-  const replay = useCallback((): Promise<void> => play(lastUrl), [play]);
+  const speak = useCallback(
+    (text: string, language: Prompt["language"]): Promise<void> => {
+      if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+        console.log("[useAudio] speech synthesis unavailable, fail-soft");
+        return Promise.resolve();
+      }
+
+      return new Promise((resolve) => {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = language === "fil" ? "fil-PH" : "en-PH";
+        utterance.rate = 0.82;
+        utterance.onend = () => resolve();
+        utterance.onerror = () => resolve();
+        // Replaying must restart the prompt rather than layer voices.
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utterance);
+      });
+    },
+    []
+  );
+
+  // Play a prompt automatically on entry. The text fallback keeps the current
+  // mock bank audible before pre-rendered TTS assets are available.
+  const playPrompt = useCallback(
+    async (prompt: Prompt): Promise<void> => {
+      lastPrompt = prompt;
+      if (await playClip(prompt.url)) return;
+      await speak(prompt.text, prompt.language);
+    },
+    [playClip, speak]
+  );
+
+  // Replay the exact prompt the child is currently answering.
+  const replay = useCallback((): Promise<void> => {
+    if (!lastPrompt) return Promise.resolve();
+    return playPrompt(lastPrompt);
+  }, [playPrompt]);
 
   // Decode-and-cache ahead of time so tap → next prompt stays < 300 ms.
   const preload = useCallback((url?: string): void => {
     if (url) void loadBuffer(url);
   }, []);
 
-  return { play, replay, preload };
+  return { playPrompt, replay, preload };
 }
