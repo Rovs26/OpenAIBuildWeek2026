@@ -1,10 +1,11 @@
-import { readdir, stat } from "node:fs/promises";
+import { readFile, readdir, stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import { itemBank } from "../src/lib/itemBank";
 
 type AssetIssue = { severity: "error" | "warning"; message: string };
 const issues: AssetIssue[] = [];
 const audioRoot = resolve(process.cwd(), "public/audio");
+const manifestPath = resolve(process.cwd(), "public/audio-manifest.json");
 
 function report(severity: AssetIssue["severity"], message: string): void {
   issues.push({ severity, message });
@@ -55,6 +56,21 @@ async function main(): Promise<void> {
   }
 
   const referenced = new Set([...targets.keys()].map((url) => resolve(process.cwd(), "public", url.replace(/^\//, ""))));
+  try {
+    const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as unknown;
+    if (!Array.isArray(manifest) || manifest.some((url) => typeof url !== "string")) {
+      report("error", "audio manifest must be a JSON array of strings");
+    } else {
+      const expected = [...targets.keys()].sort();
+      const actual = [...new Set(manifest)].sort();
+      if (actual.length !== manifest.length) report("error", "audio manifest has duplicate URLs");
+      if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+        report("error", "audio manifest does not exactly match item-bank audio URLs");
+      }
+    }
+  } catch {
+    report("error", "missing or invalid public/audio-manifest.json");
+  }
   for (const file of await listFiles(audioRoot)) {
     if (!referenced.has(file)) report("warning", `orphaned audio file ${file}`);
   }

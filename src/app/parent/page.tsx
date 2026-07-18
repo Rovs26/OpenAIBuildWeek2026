@@ -197,8 +197,8 @@ const ADVICE: Record<LevelBand, Record<Format, Advice>> = {
   },
 };
 
-// Map an itemId to its format via the mock item bank (best-effort).
-import { mockItems } from "@/lib/mockItems";
+// Map an itemId to its format via the runtime assessment bank (best-effort).
+import { itemBank } from "@/lib/itemBank";
 
 function weakestFormat(responses: ItemResponse[]): Format {
   const byFormat: Record<Format, { wrong: number; total: number }> = {
@@ -207,7 +207,7 @@ function weakestFormat(responses: ItemResponse[]): Format {
     "see-word": { wrong: 0, total: 0 },
   };
   for (const r of responses) {
-    const item = mockItems.find((i) => i.id === r.itemId);
+    const item = itemBank.find((i) => i.id === r.itemId);
     if (!item) continue;
     const f = item.format as Format;
     byFormat[f].total += 1;
