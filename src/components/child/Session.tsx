@@ -13,19 +13,22 @@ import {
   estimate,
   itemPool,
   levelBand,
-  MockSpeakingSection,
   nextItem,
-  syncResult,
 } from "./mocks";
 import ItemScreen from "./ItemScreen";
 import JourneyBar from "./JourneyBar";
 import CelebrationScreen from "./CelebrationScreen";
 import { useAudio } from "./useAudio";
+import SpeakingSection from "@/components/speaking/SpeakingSection";
+import { syncResult } from "@/lib/resultSync";
 
 const MAX_ITEMS = 15;
 const TOTAL_STOPS = 18; // 15 tap items + speaking + finish framing
 const STORAGE_KEY = "session-in-progress";
-const STUDENT_NAME = "Demo Child"; // TODO(demo): from magic-link roster
+const SPEAKING_TARGETS = {
+  en: "The dog runs.",
+  fil: "Tumakbo ang aso.",
+} as const;
 
 type Phase = "items" | "speaking" | "celebration";
 
@@ -49,11 +52,17 @@ function levelFromDifficulty(item: Item | null): 0 | 1 | 2 | 3 | 4 {
   return Math.max(0, Math.min(4, l)) as 0 | 1 | 2 | 3 | 4;
 }
 
+function sessionLanguage(responses: ItemResponse[]): "en" | "fil" {
+  const lastResponse = responses[responses.length - 1];
+  return itemPool.find((item) => item.id === lastResponse?.itemId)?.language ?? "en";
+}
+
 export default function Session() {
   const { preload } = useAudio();
   const [responses, setResponses] = useState<ItemResponse[]>([]);
   const [current, setCurrent] = useState<Item | null>(null);
   const [phase, setPhase] = useState<Phase>("items");
+  const [studentName, setStudentName] = useState("Demo Child");
   const startedAtRef = useRef<number>(Date.now());
 
   // Persist + decide the next screen from a fresh responses list.
@@ -85,6 +94,9 @@ export default function Session() {
 
   // Mount: resume prior session if one exists, else start fresh.
   useEffect(() => {
+    const name = new URLSearchParams(window.location.search).get("name")?.trim();
+    if (name) setStudentName(name);
+
     const saved = loadSaved();
     if (saved) {
       startedAtRef.current = saved.startedAt;
@@ -109,14 +121,17 @@ export default function Session() {
   function finish(speaking: SpeakingResult | undefined) {
     const { theta, standardError } = estimate(itemPool, responses);
     const result: SessionResult = {
-      studentName: STUDENT_NAME,
+      studentName,
       theta,
       standardError,
       responses,
       speaking,
       levelBand: levelBand(theta),
     };
-    void syncResult(result); // fire-and-forget; never blocks the child
+    void syncResult({
+      ...result,
+      speaking: speaking ? { ...speaking, audioUrl: "" } : undefined,
+    }); // fire-and-forget; never blocks the child
     try {
       localStorage.removeItem(STORAGE_KEY);
     } catch {
@@ -126,7 +141,14 @@ export default function Session() {
   }
 
   if (phase === "speaking") {
-    return <MockSpeakingSection onDone={finish} />;
+    const language = sessionLanguage(responses);
+    return (
+      <SpeakingSection
+        onDone={finish}
+        targetText={SPEAKING_TARGETS[language]}
+        language={language}
+      />
+    );
   }
 
   if (phase === "celebration") {

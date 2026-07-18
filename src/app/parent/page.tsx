@@ -1,12 +1,14 @@
 import type { SessionResult, LevelBand, ItemResponse } from "@/lib/types";
+import { headers } from "next/headers";
 import ClipPlayer from "./ClipPlayer";
 
 // Parent result card. Filipino-first, English subtitles. Warm, mobile-width,
 // screenshot-worthy. No theta / raw numbers except the speaking %.
 //
-// Reads the newest result from GET /api/results (that route is P3's and may not
-// exist yet). On ANY fetch failure we fall back to a seeded result so the page
-// ALWAYS renders for the demo.
+// Reads the newest result through the API. The parent renderer and route
+// handler can be isolated by Next.js in production, so they cannot share an
+// in-memory store directly. When the API is empty or unavailable, the seeded
+// fallback keeps the page always renderable for the demo.
 
 export const dynamic = "force-dynamic";
 
@@ -229,18 +231,20 @@ function weakestFormat(responses: ItemResponse[]): Format {
 
 async function fetchNewest(): Promise<SessionResult> {
   try {
-    // SWAP: P3's GET /api/results returns the session list (newest first).
-    const base = process.env.NEXT_PUBLIC_BASE_URL ?? "";
-    const res = await fetch(`${base}/api/results`, { cache: "no-store" });
-    if (!res.ok) throw new Error(`results ${res.status}`);
-    const data = await res.json();
-    const list: SessionResult[] = Array.isArray(data)
-      ? data
-      : (data.results ?? data.sessions ?? []);
-    if (!list || list.length === 0) throw new Error("no results");
-    return list[0];
+    const requestHeaders = await headers();
+    const host =
+      requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host");
+    if (!host) return SEED;
+
+    const protocol = requestHeaders.get("x-forwarded-proto") ?? "http";
+    const response = await fetch(`${protocol}://${host}/api/results`, {
+      cache: "no-store",
+    });
+    if (!response.ok) return SEED;
+
+    const results = (await response.json()) as SessionResult[];
+    return results[0] ?? SEED;
   } catch {
-    // Fallback keeps the page always renderable for the demo.
     return SEED;
   }
 }
