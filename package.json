@@ -1,14 +1,18 @@
 {
-  "name": "tmp-scaffold",
+  "name": "basa-buddy",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "pretest:p3": "next build",
+    "test:p3": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test --test-concurrency=1 src/app/api/results/p3.integration.test.mjs src/app/api/results/result-sync.test.mjs",
+    "test": "npm run test:p3"
   },
   "dependencies": {
     "next": "16.2.10",
+    "openai": "^6.48.0",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
