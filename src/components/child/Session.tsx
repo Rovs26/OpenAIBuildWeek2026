@@ -26,6 +26,10 @@ const MAX_ITEMS = 15;
 const TOTAL_STOPS = 18; // 15 tap items + speaking + finish framing
 const STORAGE_KEY = "session-in-progress";
 const STUDENT_NAME = "Demo Child"; // TODO(demo): from magic-link roster
+const SPEAKING_TARGETS = {
+  en: "The dog runs.",
+  fil: "Tumakbo ang aso.",
+} as const;
 
 type Phase = "items" | "speaking" | "celebration";
 
@@ -47,6 +51,11 @@ function levelFromDifficulty(item: Item | null): 0 | 1 | 2 | 3 | 4 {
   if (!item) return 2;
   const l = Math.round((item.difficulty + 3) / 1.5);
   return Math.max(0, Math.min(4, l)) as 0 | 1 | 2 | 3 | 4;
+}
+
+function sessionLanguage(responses: ItemResponse[]): "en" | "fil" {
+  const lastResponse = responses[responses.length - 1];
+  return itemPool.find((item) => item.id === lastResponse?.itemId)?.language ?? "en";
 }
 
 export default function Session() {
@@ -129,7 +138,14 @@ export default function Session() {
   }
 
   if (phase === "speaking") {
-    return <SpeakingSection onDone={finish} targetText="The dog runs." language="en" />;
+    const language = sessionLanguage(responses);
+    return (
+      <SpeakingSection
+        onDone={finish}
+        targetText={SPEAKING_TARGETS[language]}
+        language={language}
+      />
+    );
   }
 
   if (phase === "celebration") {
