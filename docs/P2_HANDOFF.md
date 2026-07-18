@@ -2,9 +2,9 @@
 
 ## Status
 
-The CAT engine, local item bank, and authoring scripts live on
-`feat/p2-cat-item-bank`.  The engine is client-side only: it has no network,
-React, or browser-storage dependency.
+The CAT engine, local item bank, and authoring scripts were delivered from
+`feat/p2-cat-item-bank` and are now merged into `main`. The engine is
+client-side only: it has no network, React, or browser-storage dependency.
 
 **Implementation complete — audio and human-review follow-up required.** The
 child and results flows now use the real P2 engine and bank. TTS assets are
@@ -131,5 +131,5 @@ only because no TTS credential was available in this checkout.
 - `node scripts/run-ts.mjs scripts/render-audio.ts --dry-run` — passed; lists
   all 24 planned clips.
 - `npm run build` — passed.
-- `npm test` — passed 10/10. The native test now transpiles the P3 TypeScript
+- `npm test` — passed 11/11. The native test now transpiles the P3 TypeScript
   sync module in memory using the already-installed TypeScript package.
