@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI, { toFile } from "openai";
 import type { SpeakingResult } from "@/lib/types";
+import { computeWordMatchPct } from "./scoring.mjs";
 
 // POST /api/transcribe — multipart form: { audio: Blob, targetText: string, language?: "en" | "fil" }
-// Transcribes via OpenAI whisper-1, computes wordMatchPct (in-order greedy match),
+// Transcribes via OpenAI whisper-1, computes wordMatchPct from ordered word matches,
 // and returns { speaking: SpeakingResult }. On ANY failure returns 200 { speaking: null }
 // so the child path never sees a 500 (RULES §6).
 
@@ -11,34 +12,6 @@ export const runtime = "nodejs";
 export const maxDuration = 30;
 
 const TIMEOUT_MS = 15_000;
-
-// Lowercase, strip punctuation, collapse whitespace, split into words.
-function normalizeWords(text: string): string[] {
-  return text
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s]/gu, " ")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-}
-
-// % of target words found in the transcript, in order (greedy two-pointer).
-function computeWordMatchPct(targetText: string, transcript: string): number {
-  const target = normalizeWords(targetText);
-  const said = normalizeWords(transcript);
-  if (target.length === 0) return 0;
-
-  let matched = 0;
-  let j = 0;
-  for (let i = 0; i < target.length; i++) {
-    while (j < said.length && said[j] !== target[i]) j++;
-    if (j < said.length) {
-      matched++;
-      j++;
-    }
-  }
-  return Math.round((matched / target.length) * 100);
-}
 
 function nullResponse() {
   // Frozen contract has no null speaking, but the child path expects a soft skip.
