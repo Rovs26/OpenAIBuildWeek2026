@@ -116,7 +116,10 @@ export default function Session() {
       speaking,
       levelBand: levelBand(theta),
     };
-    void syncResult(result); // fire-and-forget; never blocks the child
+    void syncResult({
+      ...result,
+      speaking: speaking ? { ...speaking, audioUrl: "" } : undefined,
+    }); // fire-and-forget; never blocks the child
     try {
       localStorage.removeItem(STORAGE_KEY);
     } catch {
