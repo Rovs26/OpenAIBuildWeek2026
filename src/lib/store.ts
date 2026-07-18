@@ -22,6 +22,10 @@ export function listResults(): SessionResult[] {
 }
 
 export function upsertResult(result: SessionResult): SessionResult {
-  resultStore.set(resultKey(result.studentName), result);
+  const key = resultKey(result.studentName);
+  // Map#set preserves an existing key's original insertion position. Remove it
+  // first so a reassessment is returned first by listResults().
+  resultStore.delete(key);
+  resultStore.set(key, result);
   return result;
 }

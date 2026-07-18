@@ -1,12 +1,17 @@
 import type { SessionResult, LevelBand, ItemResponse } from "@/lib/types";
+import { headers } from "next/headers";
+import { itemBank } from "@/lib/itemBank";
 import ClipPlayer from "./ClipPlayer";
+import Link from "next/link";
+import Agi from "@/components/child/Agi";
 
 // Parent result card. Filipino-first, English subtitles. Warm, mobile-width,
 // screenshot-worthy. No theta / raw numbers except the speaking %.
 //
-// Reads the newest result from GET /api/results (that route is P3's and may not
-// exist yet). On ANY fetch failure we fall back to a seeded result so the page
-// ALWAYS renders for the demo.
+// Reads the newest result through the API. The parent renderer and route
+// handler can be isolated by Next.js in production, so they cannot share an
+// in-memory store directly. When the API is empty or unavailable, the seeded
+// fallback keeps the page always renderable for the demo.
 
 export const dynamic = "force-dynamic";
 
@@ -35,26 +40,37 @@ const SEED: SessionResult = {
 };
 
 // ---- Band display copy (Filipino first · English subtitle) ----------------
-const BAND_COPY: Record<LevelBand, { fil: string; en: string; emoji: string }> = {
+const BAND_COPY: Record<
+  LevelBand,
+  { fil: string; en: string; emoji: string; explain: string }
+> = {
   Emerging: {
     fil: "Nagsisimula pa lang",
     en: "Just getting started",
     emoji: "🌱",
+    explain:
+      "Bago pa lang ang paglalakbay sa pagbasa. Ang bawat kwentong ibinabahagi ninyo ay tumutulong. Every story you share helps.",
   },
   Beginning: {
     fil: "Nagsisimulang bumasa",
     en: "Beginning reader",
     emoji: "📖",
+    explain:
+      "Nakikilala na ang mga salita at tunog. Handa na para sa maiikling libro nang sama-sama. Ready for short books together.",
   },
   Developing: {
     fil: "Paunlad na bumabasa",
     en: "Developing reader",
     emoji: "🌟",
+    explain:
+      "Kaya nang bumasa ng pangungusap nang mag-isa. Palakasin pa ang bokabularyo. Growing steadily—keep building words.",
   },
   "On Track": {
     fil: "Nasa tamang antas",
     en: "On track",
     emoji: "🚀",
+    explain:
+      "Malinaw at may tiwalang bumasa. Panahon na para sa mas makukulay na kwento! Ready for richer stories.",
   },
 };
 
@@ -197,8 +213,7 @@ const ADVICE: Record<LevelBand, Record<Format, Advice>> = {
   },
 };
 
-// Map an itemId to its format via the mock item bank (best-effort).
-import { mockItems } from "@/lib/mockItems";
+// Map an itemId to its format via the runtime assessment bank (best-effort).
 
 function weakestFormat(responses: ItemResponse[]): Format {
   const byFormat: Record<Format, { wrong: number; total: number }> = {
@@ -207,7 +222,7 @@ function weakestFormat(responses: ItemResponse[]): Format {
     "see-word": { wrong: 0, total: 0 },
   };
   for (const r of responses) {
-    const item = mockItems.find((i) => i.id === r.itemId);
+    const item = itemBank.find((i) => i.id === r.itemId);
     if (!item) continue;
     const f = item.format as Format;
     byFormat[f].total += 1;
@@ -229,18 +244,20 @@ function weakestFormat(responses: ItemResponse[]): Format {
 
 async function fetchNewest(): Promise<SessionResult> {
   try {
-    // SWAP: P3's GET /api/results returns the session list (newest first).
-    const base = process.env.NEXT_PUBLIC_BASE_URL ?? "";
-    const res = await fetch(`${base}/api/results`, { cache: "no-store" });
-    if (!res.ok) throw new Error(`results ${res.status}`);
-    const data = await res.json();
-    const list: SessionResult[] = Array.isArray(data)
-      ? data
-      : (data.results ?? data.sessions ?? []);
-    if (!list || list.length === 0) throw new Error("no results");
-    return list[0];
+    const requestHeaders = await headers();
+    const host =
+      requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host");
+    if (!host) return SEED;
+
+    const protocol = requestHeaders.get("x-forwarded-proto") ?? "http";
+    const response = await fetch(`${protocol}://${host}/api/results`, {
+      cache: "no-store",
+    });
+    if (!response.ok) return SEED;
+
+    const results = (await response.json()) as SessionResult[];
+    return results[0] ?? SEED;
   } catch {
-    // Fallback keeps the page always renderable for the demo.
     return SEED;
   }
 }
@@ -252,97 +269,83 @@ export default async function ParentPage() {
   const advice =
     ADVICE[result.levelBand]?.[weak] ?? ADVICE.Beginning["see-word"];
   const speaking = result.speaking;
+  const dateLabel = new Intl.DateTimeFormat("en-PH", {
+    month: "short",
+    day: "numeric",
+  }).format(new Date());
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col gap-5 bg-amber-50 px-5 py-8">
-      {/* Greeting */}
-      <header className="text-center">
-        <p className="text-sm font-medium text-amber-700">
-          Ulat para sa magulang · Parent report
-        </p>
-        <h1 className="mt-1 text-2xl font-extrabold text-slate-800">
-          {result.studentName}
-        </h1>
-      </header>
+    <main className="min-h-dvh bg-[#FFF8EB] px-4 py-6 text-[#126E82]">
+      <div className="rise-in mx-auto flex w-full max-w-[430px] flex-col gap-4">
+        <header className="flex items-center justify-between">
+          <Link href="/" className="grid h-11 w-11 place-items-center rounded-full border-2 border-[#126E82]/10 bg-white text-xl font-bold" aria-label="Back to home">←</Link>
+          <p className="font-display text-sm font-bold text-[#3E93A5]">Ulat para sa magulang · Parent report</p>
+          <span className="h-11 w-11" aria-hidden="true" />
+        </header>
 
-      {/* Level band card */}
-      <section className="rounded-3xl bg-white p-6 text-center shadow-sm ring-1 ring-amber-100">
-        <div className="text-5xl">{band.emoji}</div>
-        <p className="mt-3 text-2xl font-extrabold text-violet-600">
-          {band.fil}
-        </p>
-        <p className="text-base text-slate-500">{band.en}</p>
-      </section>
-
-      {/* Strengths */}
-      <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-amber-100">
-        <h2 className="text-base font-bold text-slate-800">
-          Mga kalakasan{" "}
-          <span className="font-normal text-slate-400">· Strengths</span>
-        </h2>
-        <ul className="mt-3 flex flex-col gap-3">
-          {advice.strengths.map((s, i) => (
-            <li key={i} className="flex items-start gap-3">
-              <span className="text-xl">✅</span>
-              <span>
-                <span className="block font-semibold text-slate-800">
-                  {s.fil}
-                </span>
-                <span className="block text-sm text-slate-500">{s.en}</span>
-              </span>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      {/* Home tips */}
-      <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-amber-100">
-        <h2 className="text-base font-bold text-slate-800">
-          Gawin sa bahay{" "}
-          <span className="font-normal text-slate-400">· Practice at home</span>
-        </h2>
-        <ul className="mt-3 flex flex-col gap-3">
-          {advice.tips.map((t, i) => (
-            <li key={i} className="flex items-start gap-3">
-              <span className="text-xl">🏠</span>
-              <span>
-                <span className="block font-semibold text-slate-800">
-                  {t.fil}
-                </span>
-                <span className="block text-sm text-slate-500">{t.en}</span>
-              </span>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      {/* Speaking clip */}
-      {speaking && (
-        <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-amber-100">
-          <h2 className="text-base font-bold text-slate-800">
-            Pagbasa nang malakas{" "}
-            <span className="font-normal text-slate-400">· Reading aloud</span>
-          </h2>
-          <p className="mt-2 text-2xl font-extrabold text-slate-800">
-            &ldquo;{speaking.targetText}&rdquo;
-          </p>
-          <p className="mt-1 text-sm text-slate-600">
-            Nabasa nang tama ang{" "}
-            <span className="font-bold text-emerald-600">
-              {speaking.wordMatchPct}%
-            </span>{" "}
-            ng mga salita
-          </p>
-          <p className="text-sm text-slate-400">
-            Read {speaking.wordMatchPct}% of the words correctly
-          </p>
-          <ClipPlayer audioUrl={speaking.audioUrl} />
+        <section className="flex items-center gap-4 rounded-[26px] bg-[#FFB703] px-5 py-4 text-[#5A3D00] shadow-[0_10px_24px_rgba(255,183,3,.24)]">
+          <Agi pose="celebrating" size={72} />
+          <div>
+            <p className="text-xs font-extrabold opacity-75">Pinakabagong paglalakbay · {dateLabel}</p>
+            <h1 className="font-display mt-0.5 text-[28px] font-extrabold leading-none">{result.studentName}</h1>
+          </div>
         </section>
-      )}
 
-      <footer className="pb-4 pt-2 text-center text-xs text-amber-700/70">
-        Isang pagsusulit · tatlong tagapakinig · walang oras ng guro
-      </footer>
+        <section className="rounded-3xl bg-white p-5 text-center shadow-[0_6px_16px_rgba(180,140,60,.11)]">
+          <div className="text-5xl" aria-hidden="true">{band.emoji}</div>
+          <p className="font-display mt-2 text-2xl font-extrabold">{band.fil}</p>
+          <p className="text-sm font-bold text-[#3E93A5]">{band.en}</p>
+          <p className="mt-3 text-[15px] font-semibold leading-relaxed">{band.explain}</p>
+        </section>
+
+        <section className="rounded-3xl bg-white p-5 shadow-[0_6px_16px_rgba(180,140,60,.11)]">
+          <h2 className="font-display text-lg font-bold">Mga kalakasan <span className="text-sm font-semibold text-[#3E93A5]">· Strengths</span></h2>
+          <ul className="mt-3 flex flex-col gap-3">
+            {advice.strengths.map((strength, index) => (
+              <li key={strength.fil} className="flex items-center gap-3">
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#6BBF59]/15 text-xl" aria-hidden="true">{index === 0 ? "🎧" : "💛"}</span>
+                <span>
+                  <span className="block font-extrabold">{strength.fil}</span>
+                  <span className="block text-sm font-semibold text-[#3E93A5]">{strength.en}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="rounded-3xl bg-white p-5 shadow-[0_6px_16px_rgba(180,140,60,.11)]">
+          <h2 className="font-display text-lg font-bold">Gawin sa bahay <span className="text-sm font-semibold text-[#3E93A5]">· Practice at home</span></h2>
+          <ul className="mt-3 flex flex-col gap-3">
+            {advice.tips.map((tip, index) => (
+              <li key={tip.fil} className="flex items-center gap-3">
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#FFB703]/20 text-xl" aria-hidden="true">{index === 0 ? "📚" : "🏠"}</span>
+                <span>
+                  <span className="block font-extrabold">{tip.fil}</span>
+                  <span className="block text-sm font-semibold text-[#3E93A5]">{tip.en}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        {speaking ? (
+          <section className="rounded-3xl bg-white p-5 shadow-[0_6px_16px_rgba(180,140,60,.11)]">
+            <h2 className="font-display text-lg font-bold">Pagbasa nang malakas <span className="text-sm font-semibold text-[#3E93A5]">· Reading aloud</span></h2>
+            <p className="font-display mt-2 text-[22px] font-extrabold">&ldquo;{speaking.targetText}&rdquo;</p>
+            <div className="mt-3 flex items-center gap-3">
+              <div className="h-3 flex-1 overflow-hidden rounded-full bg-[#F0E4C8]">
+                <div className="h-full rounded-full bg-[#6BBF59]" style={{ width: `${speaking.wordMatchPct}%` }} />
+              </div>
+              <span className="font-display text-xl font-extrabold text-[#4B9D3E]">{speaking.wordMatchPct}%</span>
+            </div>
+            <p className="mt-1 text-xs font-semibold text-[#3E93A5]">Bahagi ng mga salitang malinaw na nabasa · Share of words read clearly</p>
+            <ClipPlayer audioUrl={speaking.audioUrl} />
+          </section>
+        ) : null}
+
+        <p className="py-1 text-center text-sm font-extrabold text-[#FB8500]">Maliit na hakbang araw-araw, mas matatag na mambabasa. 🌱</p>
+        <Link href="/" className="flex min-h-14 items-center justify-center rounded-[22px] border-[3px] border-[#126E82]/15 bg-white font-display text-base font-bold">← Back to home</Link>
+      </div>
     </main>
   );
 }
