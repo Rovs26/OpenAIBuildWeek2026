@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SpeakingResult } from "@/lib/types";
+import Agi from "@/components/child/Agi";
 
 // Standalone speaking step. P1 mounts this after item 15:
 //   <SpeakingSection onDone={(speaking) => finishSession(speaking)} />
@@ -214,24 +215,38 @@ export default function SpeakingSection({
   // ---- Render -------------------------------------------------------------
 
   const container =
-    "flex flex-col items-center justify-center gap-6 px-6 py-10 text-center";
+    "rise-in flex min-h-dvh flex-col items-center justify-center gap-5 px-6 py-8 text-center";
+
+  const heading = (
+    <>
+      <Agi pose="reading" size={102} />
+      <div>
+        <p className="font-display text-[26px] font-bold leading-tight text-[#126E82]">
+          Ngayon, ikaw naman ang magbasa!
+        </p>
+        <p className="mt-1 text-sm font-bold text-[#3E93A5]">Now you read to me!</p>
+      </div>
+      <div className="rounded-3xl border-[3px] border-[#FFB703]/40 bg-white px-6 py-5 shadow-[0_8px_20px_rgba(180,140,60,.14)]">
+        <p className="font-display text-[32px] font-extrabold leading-tight text-[#126E82]">
+          {targetText}
+        </p>
+      </div>
+    </>
+  );
 
   if (mock || phase === "mock") {
     return (
       <section className={container} aria-label="Speaking (demo)">
-        <p className="text-lg font-semibold text-violet-600">Read it out loud!</p>
-        <p className="text-4xl font-extrabold leading-snug text-slate-800">
-          {targetText}
-        </p>
+        {heading}
         <button
           type="button"
           onClick={runMock}
-          className="flex h-40 w-40 items-center justify-center rounded-full bg-gradient-to-b from-rose-400 to-rose-500 text-6xl shadow-lg shadow-rose-200 transition active:scale-95"
+          className="flex h-[118px] w-[118px] items-center justify-center rounded-full bg-[#FB8500] text-5xl shadow-[0_10px_0_#D96F00,0_18px_30px_rgba(251,133,0,.28)] transition active:translate-y-1 active:shadow-[0_5px_0_#D96F00]"
           aria-label="Tap the microphone to read"
         >
           🎤
         </button>
-        <p className="text-base text-slate-500">Tap the mic and read!</p>
+        <p className="text-sm font-bold text-[#3E93A5]">Pindutin ang mikropono kapag handa ka na.</p>
       </section>
     );
   }
@@ -239,9 +254,9 @@ export default function SpeakingSection({
   if (phase === "processing") {
     return (
       <section className={container} aria-label="Listening">
-        <div className="text-6xl">👂</div>
-        <p className="text-2xl font-bold text-slate-700">Listening…</p>
-        <p className="text-base text-slate-500">Great reading!</p>
+        <Agi pose="listening" size={132} />
+        <p className="font-display text-3xl font-bold text-[#126E82]">Pinapakinggan ka ni Agi…</p>
+        <p className="text-base font-bold text-[#3E93A5]">Ang husay mong magbasa!</p>
       </section>
     );
   }
@@ -249,17 +264,16 @@ export default function SpeakingSection({
   if (phase === "playback" && result) {
     return (
       <section className={container} aria-label="Listen to yourself">
-        <p className="text-2xl font-bold text-violet-600">
-          Listen to yourself read! 🎧
-        </p>
-        <p className="text-3xl font-extrabold leading-snug text-slate-800">
-          {targetText}
-        </p>
+        <Agi pose="encouraging" size={112} />
+        <p className="font-display text-[26px] font-bold text-[#126E82]">Pakinggan ang iyong pagbasa! 🎧</p>
+        <div className="rounded-3xl border-[3px] border-[#FFB703]/40 bg-white px-6 py-5 shadow-[0_8px_20px_rgba(180,140,60,.14)]">
+          <p className="font-display text-3xl font-extrabold leading-snug text-[#126E82]">{targetText}</p>
+        </div>
         <audio ref={audioElRef} src={audioUrl} preload="auto" />
         <button
           type="button"
           onClick={playRecording}
-          className="flex h-40 w-40 items-center justify-center rounded-full bg-gradient-to-b from-sky-400 to-sky-500 text-6xl shadow-lg shadow-sky-200 transition active:scale-95"
+          className="flex h-[112px] w-[112px] items-center justify-center rounded-full bg-[#126E82] text-5xl text-white shadow-[0_9px_0_#0F5A6B] transition active:translate-y-1 active:shadow-[0_4px_0_#0F5A6B]"
           aria-label="Play your recording"
         >
           ▶️
@@ -267,9 +281,9 @@ export default function SpeakingSection({
         <button
           type="button"
           onClick={() => onDone(result)}
-          className="mt-2 min-h-16 rounded-full bg-emerald-500 px-10 text-2xl font-bold text-white shadow-md shadow-emerald-200 transition active:scale-95"
+          className="mt-2 min-h-16 rounded-3xl bg-[#6BBF59] px-10 font-display text-xl font-bold text-white shadow-[0_7px_0_#4B9D3E] transition active:translate-y-1 active:shadow-[0_3px_0_#4B9D3E]"
         >
-          I&apos;m done! 🎉
+          Tapos na! 🎉
         </button>
       </section>
     );
@@ -279,25 +293,33 @@ export default function SpeakingSection({
   const recording = phase === "recording";
   return (
     <section className={container} aria-label="Read out loud">
-      <p className="text-lg font-semibold text-violet-600">Read it out loud!</p>
-      <p className="text-4xl font-extrabold leading-snug text-slate-800">
-        {targetText}
-      </p>
-      <button
-        type="button"
-        onClick={recording ? stopRecording : startRecording}
-        className={[
-          "flex h-40 w-40 items-center justify-center rounded-full text-6xl shadow-lg transition active:scale-95",
-          recording
-            ? "animate-pulse bg-gradient-to-b from-red-500 to-red-600 shadow-red-300 ring-8 ring-red-200"
-            : "bg-gradient-to-b from-rose-400 to-rose-500 shadow-rose-200",
-        ].join(" ")}
-        aria-label={recording ? "Stop recording" : "Tap the microphone to read"}
-      >
-        {recording ? "⏹️" : "🎤"}
-      </button>
-      <p className="text-base text-slate-500">
-        {recording ? "Recording… tap to stop" : "Tap the mic and read!"}
+      {heading}
+      <div className="relative grid h-[126px] w-[126px] place-items-center">
+        {recording ? (
+          <>
+            <span className="listening-ring absolute inset-2 rounded-full bg-[#FB8500]" />
+            <span className="listening-ring absolute inset-2 rounded-full bg-[#FB8500] [animation-delay:.65s]" />
+          </>
+        ) : null}
+        <button
+          type="button"
+          onClick={recording ? stopRecording : startRecording}
+          className="relative flex h-[118px] w-[118px] items-center justify-center rounded-full bg-[#FB8500] text-5xl shadow-[0_10px_0_#D96F00,0_18px_30px_rgba(251,133,0,.28)] transition active:translate-y-1 active:shadow-[0_5px_0_#D96F00]"
+          aria-label={recording ? "Stop recording" : "Tap the microphone to read"}
+        >
+          {recording ? "⏹️" : "🎤"}
+        </button>
+      </div>
+
+      {recording ? (
+        <div className="flex h-9 items-center gap-1" aria-hidden="true">
+          {[14, 24, 18, 30, 20, 32, 16, 26, 15].map((height, index) => (
+            <span key={index} className="waveform-bar w-1.5 rounded-full bg-[#126E82]" style={{ height, animationDelay: `${index * 70}ms` }} />
+          ))}
+        </div>
+      ) : null}
+      <p className="text-sm font-bold text-[#3E93A5]">
+        {recording ? "Nakikinig si Agi… pindutin para huminto." : "Pindutin ang mikropono kapag handa ka na."}
       </p>
     </section>
   );

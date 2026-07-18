@@ -10,6 +10,8 @@ import { useCallback } from "react";
 let ctx: AudioContext | null = null;
 const bufferCache = new Map<string, AudioBuffer>();
 let lastUrl: string | undefined;
+type SpokenPrompt = { text: string; language: "en" | "fil" };
+let lastPrompt: SpokenPrompt | undefined;
 
 function getCtx(): AudioContext | null {
   if (ctx) return ctx;
@@ -60,14 +62,38 @@ async function loadBuffer(url: string): Promise<AudioBuffer | null> {
   }
 }
 
+function speakPrompt(prompt?: SpokenPrompt): void {
+  if (!prompt || typeof window === "undefined" || !window.speechSynthesis) return;
+  try {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(prompt.text);
+    utterance.lang = prompt.language === "fil" ? "fil-PH" : "en-US";
+    utterance.rate = 0.85;
+    utterance.pitch = 1.05;
+    window.speechSynthesis.speak(utterance);
+  } catch (error) {
+    console.log("[useAudio] speech synthesis failed softly:", error);
+  }
+}
+
 export function useAudio() {
   // Play a prompt; resolves when playback ends (or immediately if unavailable).
-  const play = useCallback(async (url?: string): Promise<void> => {
+  const play = useCallback(async (
+    url?: string,
+    prompt?: SpokenPrompt,
+  ): Promise<void> => {
     if (url) lastUrl = url;
+    if (prompt) lastPrompt = prompt;
     const c = getCtx();
-    if (!url || !c) return; // fail soft — mockItems have no audioUrl yet
+    if (!url || !c) {
+      speakPrompt(prompt);
+      return;
+    }
     const buf = await loadBuffer(url);
-    if (!buf) return; // fail soft
+    if (!buf) {
+      speakPrompt(prompt);
+      return;
+    }
     await new Promise<void>((resolve) => {
       try {
         const src = c.createBufferSource();
@@ -82,7 +108,7 @@ export function useAudio() {
   }, []);
 
   // Replay the current prompt (bound to the 🔊 button).
-  const replay = useCallback((): Promise<void> => play(lastUrl), [play]);
+  const replay = useCallback((): Promise<void> => play(lastUrl, lastPrompt), [play]);
 
   // Decode-and-cache ahead of time so tap → next prompt stays < 300 ms.
   const preload = useCallback((url?: string): void => {

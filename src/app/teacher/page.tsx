@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { SessionResult } from "@/lib/types";
 
@@ -11,46 +12,44 @@ type TeacherStudent = {
   isLive?: boolean;
 };
 
-const bandStyles: Record<SessionResult["levelBand"], string> = {
-  Emerging: "bg-rose-100 text-rose-800 ring-rose-200",
-  Beginning: "bg-amber-100 text-amber-800 ring-amber-200",
-  Developing: "bg-sky-100 text-sky-800 ring-sky-200",
-  "On Track": "bg-emerald-100 text-emerald-800 ring-emerald-200",
+const BAND_STYLES: Record<SessionResult["levelBand"], string> = {
+  Emerging: "bg-[#FB8500]/15 text-[#B95600]",
+  Beginning: "bg-[#FFB703]/20 text-[#8A6100]",
+  Developing: "bg-[#126E82]/10 text-[#0F5A6B]",
+  "On Track": "bg-[#6BBF59]/20 text-[#397F2C]",
 };
+
+function levelBand(theta: number): SessionResult["levelBand"] {
+  if (theta < -1.5) return "Emerging";
+  if (theta < -0.5) return "Beginning";
+  if (theta < 0.5) return "Developing";
+  return "On Track";
+}
 
 function seededStudent(
   studentName: string,
   theta: number,
   vocabulary: number,
   comprehension: number,
-  needsSupport = false,
 ): TeacherStudent {
-  const levelBand: SessionResult["levelBand"] =
-    theta < -1.5
-      ? "Emerging"
-      : theta < -0.5
-        ? "Beginning"
-        : theta < 0.5
-          ? "Developing"
-          : "On Track";
-
+  const band = levelBand(theta);
   return {
     result: {
       studentName,
       theta,
       standardError: 0.48,
       responses: [],
-      levelBand,
+      levelBand: band,
     },
     vocabulary,
     comprehension,
-    needsSupport,
+    needsSupport: band === "Emerging" || band === "Beginning",
   };
 }
 
-const seedStudents: TeacherStudent[] = [
-  seededStudent("Mika Santos", -2.1, 24, 19, true),
-  seededStudent("Paolo Reyes", -0.9, 41, 35, true),
+const SEED_STUDENTS: TeacherStudent[] = [
+  seededStudent("Mika Santos", -2.1, 24, 19),
+  seededStudent("Paolo Reyes", -0.9, 41, 35),
   seededStudent("Lia Mendoza", -0.45, 48, 45),
   seededStudent("Noah Garcia", -0.2, 54, 49),
   seededStudent("Sofia Ramos", 0.05, 58, 56),
@@ -70,7 +69,6 @@ function clampPercent(value: number) {
 function liveStudent(result: SessionResult): TeacherStudent {
   const overall = clampPercent(((result.theta + 3) / 6) * 100);
   const responseLift = Math.min(8, Math.round(result.responses.length / 3));
-
   return {
     result,
     vocabulary: clampPercent(overall + responseLift),
@@ -80,23 +78,25 @@ function liveStudent(result: SessionResult): TeacherStudent {
   };
 }
 
-function ThetaBar({ theta }: { theta: number }) {
-  const position = clampPercent(((theta + 3) / 6) * 100);
+function abilityLabel(theta: number) {
+  if (theta < -1.5) return "Just starting";
+  if (theta < -0.5) return "Beginning";
+  if (theta < 0.5) return "Developing";
+  return "On track";
+}
 
+function AbilityBar({ theta, needsSupport }: { theta: number; needsSupport: boolean }) {
+  const position = clampPercent(((theta + 3) / 6) * 100);
   return (
-    <div className="min-w-36">
-      <div className="mb-1 flex items-center justify-between text-xs text-slate-500">
-        <span>-3</span>
-        <span className="font-mono font-semibold text-slate-700">
-          {theta > 0 ? "+" : ""}
-          {theta.toFixed(2)}
-        </span>
-        <span>+3</span>
+    <div className="mt-4">
+      <div className="mb-1 flex justify-between text-[11px] font-bold text-[#3E93A5]">
+        <span>Reading ability</span>
+        <span>{abilityLabel(theta)}</span>
       </div>
-      <div className="relative h-2 rounded-full bg-slate-200">
-        <div className="absolute inset-y-0 left-1/2 w-px bg-slate-400" />
-        <div
-          className="absolute top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-indigo-600 shadow"
+      <div className="relative h-2 rounded-full bg-[#EEF2F0]">
+        <span className="absolute inset-y-[-3px] left-1/2 w-0.5 bg-[#CBD5D2]" />
+        <span
+          className={`absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-white shadow ${needsSupport ? "bg-[#FB8500]" : "bg-[#126E82]"}`}
           style={{ left: `${position}%` }}
         />
       </div>
@@ -104,17 +104,14 @@ function ThetaBar({ theta }: { theta: number }) {
   );
 }
 
-function SkillBar({ label, value }: { label: string; value: number }) {
+function SkillBar({ label, value, color }: { label: string; value: number; color: string }) {
   return (
-    <div className="grid grid-cols-[5.5rem_1fr_2rem] items-center gap-2 text-xs">
-      <span className="text-slate-500">{label}</span>
-      <div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
-        <div
-          className="h-full rounded-full bg-indigo-500"
-          style={{ width: `${value}%` }}
-        />
+    <div className="grid grid-cols-[5.5rem_1fr_2rem] items-center gap-2 text-[11px] font-bold text-[#3E93A5]">
+      <span>{label}</span>
+      <div className="h-1.5 overflow-hidden rounded-full bg-[#EEF2F0]">
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${value}%` }} />
       </div>
-      <span className="text-right font-mono text-slate-600">{value}</span>
+      <span className="text-right text-[#126E82]">{value}</span>
     </div>
   );
 }
@@ -125,7 +122,6 @@ export default function TeacherPage() {
 
   useEffect(() => {
     let active = true;
-
     const loadResults = async () => {
       try {
         const response = await fetch("/api/results", { cache: "no-store" });
@@ -139,10 +135,8 @@ export default function TeacherPage() {
         console.warn("Teacher results refresh failed.", error);
       }
     };
-
     void loadResults();
     const interval = window.setInterval(loadResults, 5_000);
-
     return () => {
       active = false;
       window.clearInterval(interval);
@@ -151,135 +145,104 @@ export default function TeacherPage() {
 
   const students = useMemo(() => {
     const live = liveResults.map(liveStudent);
-    const liveNames = new Set(
-      live.map((student) => student.result.studentName.toLocaleLowerCase("en")),
-    );
+    const liveNames = new Set(live.map((student) => student.result.studentName.toLocaleLowerCase("en")));
     return [
       ...live,
-      ...seedStudents.filter(
-        (student) =>
-          !liveNames.has(student.result.studentName.toLocaleLowerCase("en")),
+      ...SEED_STUDENTS.filter(
+        (student) => !liveNames.has(student.result.studentName.toLocaleLowerCase("en")),
       ),
     ];
   }, [liveResults]);
 
-  const flaggedCount = students.filter((student) => student.needsSupport).length;
+  const metrics = useMemo(() => {
+    const needsSupport = students.filter((student) => student.needsSupport).length;
+    const developing = students.filter((student) => student.result.levelBand === "Developing").length;
+    const onTrack = students.filter((student) => student.result.levelBand === "On Track").length;
+    return [
+      { value: students.length, label: "Learners assessed", detail: "this session", color: "text-[#126E82]", border: "border-[#126E82]/15" },
+      { value: needsSupport, label: "Need support", detail: "Emerging + Beginning", color: "text-[#FB8500]", border: "border-[#FB8500]/30" },
+      { value: developing, label: "Developing", detail: "steadily growing", color: "text-[#C98B00]", border: "border-[#FFB703]/35" },
+      { value: onTrack, label: "On track", detail: "grade-band ready", color: "text-[#4B9D3E]", border: "border-[#6BBF59]/35" },
+    ];
+  }, [students]);
 
   return (
-    <main className="min-h-screen bg-[#f7f8fc] px-4 py-6 text-slate-900 sm:px-8 lg:px-12">
-      <div className="mx-auto max-w-7xl">
-        <header className="mb-6 rounded-3xl bg-indigo-950 px-6 py-6 text-white shadow-xl shadow-indigo-950/10 sm:px-8 sm:py-8">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+    <main className="min-h-dvh bg-[#FFF8EB] px-4 py-6 text-[#126E82] sm:px-7 lg:px-10">
+      <div className="rise-in mx-auto w-full max-w-[1180px]">
+        <header className="flex flex-col gap-5 rounded-[26px] border-2 border-[#126E82]/10 bg-white px-5 py-5 shadow-[0_10px_26px_rgba(180,140,60,.1)] sm:flex-row sm:items-center sm:justify-between sm:px-7">
+          <div className="flex items-center gap-4">
+            <Link href="/" className="font-display text-[25px] font-extrabold tracking-[-.02em]" aria-label="Basa Buddy home">
+              <span>Basa</span><span className="text-[#FFB703]">Buddy</span>
+            </Link>
+            <span className="h-9 w-px bg-[#126E82]/15" />
             <div>
-              <div className="mb-3 flex items-center gap-3 text-sm font-medium text-indigo-200">
-                <span className="grid size-9 place-items-center rounded-xl bg-amber-400 text-xl text-indigo-950">
-                  🦉
-                </span>
-                Basa Buddy · Teacher View
-              </div>
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-300">
-                Grade 2 · Sampaguita
+              <h1 className="font-display text-xl font-bold">Grade 2 · Sampaguita</h1>
+              <p className="text-sm font-extrabold">Class literacy snapshot</p>
+              <p className="mt-0.5 flex items-center gap-1.5 text-xs font-bold text-[#3E93A5]">
+                <span className="h-2 w-2 rounded-full bg-[#6BBF59]" />
+                Live sync{lastUpdated ? ` · updated ${lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}
               </p>
-              <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
-                Class literacy snapshot
-              </h1>
-            </div>
-            <div className="flex gap-3">
-              <div className="rounded-2xl bg-white/10 px-4 py-3 ring-1 ring-white/15">
-                <p className="text-2xl font-semibold">{students.length}</p>
-                <p className="text-xs text-indigo-200">Learners assessed</p>
-              </div>
-              <div className="rounded-2xl bg-rose-400/15 px-4 py-3 ring-1 ring-rose-300/25">
-                <p className="text-2xl font-semibold text-rose-200">{flaggedCount}</p>
-                <p className="text-xs text-rose-100">Need support</p>
-              </div>
             </div>
           </div>
+          <Link href="/child" className="flex min-h-14 items-center justify-center rounded-[18px] bg-[#FB8500] px-6 font-display text-base font-bold text-white shadow-[0_6px_0_#D96F00] active:translate-y-1 active:shadow-[0_3px_0_#D96F00]">
+            Open child assessment →
+          </Link>
         </header>
 
-        <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex flex-col gap-2 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-7">
-            <div>
-              <h2 className="text-lg font-semibold">Learner results</h2>
-              <p className="text-sm text-slate-500">
-                Ability, confidence band, and where to focus next.
-              </p>
+        <section className="mt-4 grid grid-cols-2 gap-3.5 lg:grid-cols-4" aria-label="Class summary">
+          {metrics.map((metric) => (
+            <div key={metric.label} className={`rounded-[22px] border-2 bg-white p-4 shadow-[0_6px_16px_rgba(180,140,60,.09)] sm:p-5 ${metric.border}`}>
+              <p className={`font-display text-4xl font-extrabold leading-none ${metric.color}`}>{metric.value}</p>
+              <p className="mt-2 text-sm font-extrabold">{metric.label}</p>
+              <p className="text-xs font-semibold text-[#3E93A5]">{metric.detail}</p>
             </div>
-            <div className="flex items-center gap-2 text-xs text-slate-500">
-              <span className="size-2 rounded-full bg-emerald-500" />
-              Auto-refreshing every 5 seconds
-              {lastUpdated && (
-                <span className="hidden sm:inline">
-                  · {lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[920px] border-collapse text-left">
-              <thead>
-                <tr className="bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  <th className="px-6 py-4">Learner</th>
-                  <th className="px-4 py-4">Level band</th>
-                  <th className="px-4 py-4">Ability estimate</th>
-                  <th className="px-4 py-4">Domain split</th>
-                  <th className="px-6 py-4">Intervention</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {students.map((student) => (
-                  <tr
-                    key={student.result.studentName}
-                    className={student.isLive ? "bg-indigo-50/60" : "hover:bg-slate-50/70"}
-                  >
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <span className="grid size-10 place-items-center rounded-full bg-slate-100 font-semibold text-slate-700">
-                          {student.result.studentName.charAt(0)}
-                        </span>
-                        <div>
-                          <p className="font-semibold text-slate-900">
-                            {student.result.studentName}
-                          </p>
-                          <p className="text-xs text-slate-500">
-                            {student.isLive ? "Just synced" : "Latest assessment"}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <span
-                        className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset ${bandStyles[student.result.levelBand]}`}
-                      >
-                        {student.result.levelBand}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4">
-                      <ThetaBar theta={student.result.theta} />
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="space-y-2">
-                        <SkillBar label="Vocabulary" value={student.vocabulary} />
-                        <SkillBar label="Comprehension" value={student.comprehension} />
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      {student.needsSupport ? (
-                        <span className="inline-flex items-center gap-2 rounded-full bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 ring-1 ring-inset ring-rose-200">
-                          <span className="size-1.5 rounded-full bg-rose-500" />
-                          Needs support
-                        </span>
-                      ) : (
-                        <span className="text-sm font-medium text-emerald-700">On track</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          ))}
         </section>
+
+        <div className="mt-6 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <h2 className="font-display text-xl font-bold">Learner results</h2>
+          <p className="text-xs font-semibold text-[#3E93A5]">Name first · educational reading second · technical estimate last</p>
+        </div>
+
+        <section className="mt-3 grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-3" aria-label="Learner results">
+          {students.map((student) => {
+            const { result } = student;
+            return (
+              <article
+                key={result.studentName}
+                className={`relative rounded-[22px] border-2 bg-white p-4 shadow-[0_6px_16px_rgba(180,140,60,.09)] ${student.needsSupport ? "border-[#FB8500]/30" : "border-[#126E82]/10"}`}
+              >
+                {student.isLive ? (
+                  <span className="absolute right-4 top-4 flex items-center gap-1 text-[11px] font-extrabold text-[#4B9D3E]"><span className="h-2 w-2 rounded-full bg-[#6BBF59]" />Just synced</span>
+                ) : null}
+                <div className="flex items-center gap-3">
+                  <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl font-display text-xl font-extrabold ${student.needsSupport ? "bg-[#FB8500]/15 text-[#B95600]" : "bg-[#126E82]/10"}`}>
+                    {result.studentName.charAt(0)}
+                  </span>
+                  <div>
+                    <h3 className="font-display text-lg font-bold">{result.studentName}</h3>
+                    <span className={`mt-0.5 inline-flex rounded-full px-3 py-1 text-xs font-extrabold ${BAND_STYLES[result.levelBand]}`}>{result.levelBand}</span>
+                  </div>
+                </div>
+
+                <AbilityBar theta={result.theta} needsSupport={student.needsSupport} />
+                <div className="mt-3 flex flex-col gap-2">
+                  <SkillBar label="Vocabulary" value={student.vocabulary} color="bg-[#126E82]" />
+                  <SkillBar label="Comprehension" value={student.comprehension} color="bg-[#FFB703]" />
+                </div>
+
+                <div className="mt-3 flex items-center justify-between border-t-2 border-[#126E82]/6 pt-3">
+                  <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-extrabold ${student.needsSupport ? "bg-[#FB8500]/12 text-[#B95600]" : "bg-[#6BBF59]/15 text-[#397F2C]"}`}>
+                    {student.needsSupport ? "🤝 Needs focused support" : "✓ On track"}
+                  </span>
+                  <span className="font-mono text-[11px] font-bold text-[#8AA5A2]">θ {result.theta > 0 ? "+" : ""}{result.theta.toFixed(2)}</span>
+                </div>
+              </article>
+            );
+          })}
+        </section>
+
+        <Link href="/" className="mt-6 inline-flex min-h-12 items-center rounded-[18px] border-2 border-[#126E82]/15 bg-white px-5 font-display text-sm font-bold">← Back to home</Link>
       </div>
     </main>
   );
