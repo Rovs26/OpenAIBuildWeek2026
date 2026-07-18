@@ -1,21 +1,44 @@
-const CACHE_VERSION = "basa-buddy-v1";
+const CACHE_VERSION = "basa-buddy-v2";
 const APP_CACHE = `${CACHE_VERSION}-app`;
 const ASSET_CACHE = `${CACHE_VERSION}-assets`;
+const AUDIO_MANIFEST_URL = "/audio-manifest.json";
 const APP_SHELL = [
   "/",
   "/child",
   "/manifest.webmanifest",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
+  AUDIO_MANIFEST_URL,
 ];
+
+async function precacheAssessmentAudio() {
+  try {
+    const manifestResponse = await fetch(AUDIO_MANIFEST_URL, { cache: "reload" });
+    if (!manifestResponse.ok) return;
+    const urls = await manifestResponse.json();
+    if (!Array.isArray(urls)) return;
+
+    const cache = await caches.open(ASSET_CACHE);
+    await Promise.allSettled(
+      urls
+        .filter((url) => typeof url === "string" && url.startsWith("/audio/"))
+        .map((url) => cache.add(new Request(url, { cache: "reload" }))),
+    );
+  } catch {
+    // Audio remains cache-first on demand if a manifest fetch is unavailable.
+  }
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(APP_CACHE).then((cache) =>
-      Promise.allSettled(
-        APP_SHELL.map((url) => cache.add(new Request(url, { cache: "reload" }))),
+    Promise.allSettled([
+      caches.open(APP_CACHE).then((cache) =>
+        Promise.allSettled(
+          APP_SHELL.map((url) => cache.add(new Request(url, { cache: "reload" }))),
+        ),
       ),
-    ),
+      precacheAssessmentAudio(),
+    ]),
   );
   self.skipWaiting();
 });
