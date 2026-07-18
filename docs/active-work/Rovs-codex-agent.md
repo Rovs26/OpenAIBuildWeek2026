@@ -2,7 +2,7 @@ Owner:
 Rovs / Codex (P2)
 
 Status:
-IN PROGRESS
+IN PROGRESS — ENGINE/BANK READY; AUDIO RELEASE BLOCKED
 
 Task:
 Build the deterministic 2PL EAP CAT engine, tests, bilingual item bank, offline authoring/validation scripts, and P1/P3 handoff documentation.
@@ -33,3 +33,7 @@ Notes:
 - No active claims were present at preflight.
 - P3 and P4 remote branches are confined to their owned paths; no P2 overlap detected.
 - No package or lockfile changes are planned.
+- Delivered: deterministic 2PL/EAP engine, 36-item bilingual runtime bank,
+  CAT/data tests, authoring scripts, validation scripts, console demo, and P1/P3 handoff.
+- Audio release gate: `OPENAI_API_KEY` was absent, so no MP3s were fabricated;
+  all 24 audio-led targets remain for generation and manual Filipino review.
