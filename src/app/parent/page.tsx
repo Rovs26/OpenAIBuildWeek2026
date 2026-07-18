@@ -1,12 +1,12 @@
 import type { SessionResult, LevelBand, ItemResponse } from "@/lib/types";
+import { listResults } from "@/lib/store";
 import ClipPlayer from "./ClipPlayer";
 
 // Parent result card. Filipino-first, English subtitles. Warm, mobile-width,
 // screenshot-worthy. No theta / raw numbers except the speaking %.
 //
-// Reads the newest result from GET /api/results (that route is P3's and may not
-// exist yet). On ANY fetch failure we fall back to a seeded result so the page
-// ALWAYS renders for the demo.
+// Reads the newest in-process result. When no assessment has arrived yet, the
+// seeded fallback keeps the page always renderable for the demo.
 
 export const dynamic = "force-dynamic";
 
@@ -227,26 +227,8 @@ function weakestFormat(responses: ItemResponse[]): Format {
   return worst;
 }
 
-async function fetchNewest(): Promise<SessionResult> {
-  try {
-    // SWAP: P3's GET /api/results returns the session list (newest first).
-    const base = process.env.NEXT_PUBLIC_BASE_URL ?? "";
-    const res = await fetch(`${base}/api/results`, { cache: "no-store" });
-    if (!res.ok) throw new Error(`results ${res.status}`);
-    const data = await res.json();
-    const list: SessionResult[] = Array.isArray(data)
-      ? data
-      : (data.results ?? data.sessions ?? []);
-    if (!list || list.length === 0) throw new Error("no results");
-    return list[0];
-  } catch {
-    // Fallback keeps the page always renderable for the demo.
-    return SEED;
-  }
-}
-
 export default async function ParentPage() {
-  const result = await fetchNewest();
+  const result = listResults()[0] ?? SEED;
   const band = BAND_COPY[result.levelBand] ?? BAND_COPY.Beginning;
   const weak = weakestFormat(result.responses);
   const advice =
