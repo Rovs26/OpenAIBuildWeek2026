@@ -25,7 +25,6 @@ import { syncResult } from "@/lib/resultSync";
 const MAX_ITEMS = 15;
 const TOTAL_STOPS = 18; // 15 tap items + speaking + finish framing
 const STORAGE_KEY = "session-in-progress";
-const STUDENT_NAME = "Demo Child"; // TODO(demo): from magic-link roster
 const SPEAKING_TARGETS = {
   en: "The dog runs.",
   fil: "Tumakbo ang aso.",
@@ -63,6 +62,7 @@ export default function Session() {
   const [responses, setResponses] = useState<ItemResponse[]>([]);
   const [current, setCurrent] = useState<Item | null>(null);
   const [phase, setPhase] = useState<Phase>("items");
+  const [studentName, setStudentName] = useState("Demo Child");
   const startedAtRef = useRef<number>(Date.now());
 
   // Persist + decide the next screen from a fresh responses list.
@@ -94,6 +94,9 @@ export default function Session() {
 
   // Mount: resume prior session if one exists, else start fresh.
   useEffect(() => {
+    const name = new URLSearchParams(window.location.search).get("name")?.trim();
+    if (name) setStudentName(name);
+
     const saved = loadSaved();
     if (saved) {
       startedAtRef.current = saved.startedAt;
@@ -118,7 +121,7 @@ export default function Session() {
   function finish(speaking: SpeakingResult | undefined) {
     const { theta, standardError } = estimate(itemPool, responses);
     const result: SessionResult = {
-      studentName: STUDENT_NAME,
+      studentName,
       theta,
       standardError,
       responses,
