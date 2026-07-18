@@ -26,25 +26,34 @@ export default function ItemScreen({
   item: Item;
   onAnswer: (choiceId: string, ms: number) => void;
 }) {
-  const { play, replay } = useAudio();
+  const { playPrompt, replay } = useAudio();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [phrase, setPhrase] = useState("");
   const startRef = useRef<number>(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const isHear = item.format === "hear-word" || item.format === "hear-sentence";
-
-  // New item: reset, autoplay prompt audio for hear-* (post-unlock), start clock.
+  // New item: reset, voice a prompt (post-unlock), start clock. A see-word item
+  // must never read the displayed word aloud; it measures decoding, so it only
+  // gets a language-matched instruction that replay can safely repeat.
   useEffect(() => {
     setSelectedId(null);
     setPhrase("");
     startRef.current = performance.now();
-    if (isHear) void play(item.audioUrl);
+    void playPrompt({
+      url: item.format === "see-word" ? undefined : item.audioUrl,
+      text:
+        item.format === "see-word"
+          ? item.language === "fil"
+            ? "Pindutin ang larawang tugma sa salita!"
+            : "Tap the picture that matches the word!"
+          : item.prompt,
+      language: item.language,
+    });
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [item.id]);
+  }, [item, playPrompt]);
 
   function handlePick(choiceId: string) {
     if (selectedId) return; // one answer per item
