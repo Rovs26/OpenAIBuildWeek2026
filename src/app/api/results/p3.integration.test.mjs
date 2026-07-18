@@ -272,38 +272,12 @@ test("returns a reassessed learner first", async () => {
   assert.equal(results[0].studentName, "a3 reassessed learner");
 });
 
-test("returns a reassessed learner first", async () => {
-  const resultFor = (studentName, correct) => ({
-    studentName,
-    theta: 0,
-    standardError: 1,
-    responses: [{ itemId: "one", choiceId: "a", correct, ms: 800 }],
-    levelBand: "Developing",
-  });
-
-  for (const result of [
-    resultFor("A3 Reassessed Learner", false),
-    resultFor("A3 Newer Learner", true),
-    resultFor("a3 reassessed learner", true),
-  ]) {
-    const response = await fetch(`${baseUrl}/api/results`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(result),
-    });
-    assert.equal(response.status, 201);
-  }
-
-  const results = await (await fetch(`${baseUrl}/api/results`)).json();
-  assert.equal(results[0].studentName, "a3 reassessed learner");
-});
-
 test("renders the newest live result in the parent report", async () => {
   const submitted = {
     studentName: "Parent Report Learner",
     theta: 0,
     standardError: 1,
-    responses: [{ itemId: "m01", choiceId: "a", correct: true, ms: 800 }],
+    responses: [answerFor(itemBank[3], true, 0)],
     levelBand: "Developing",
   };
 
