@@ -13,14 +13,14 @@ import {
   estimate,
   itemPool,
   levelBand,
-  MockSpeakingSection,
   nextItem,
-  syncResult,
 } from "./mocks";
 import ItemScreen from "./ItemScreen";
 import JourneyBar from "./JourneyBar";
 import CelebrationScreen from "./CelebrationScreen";
 import { useAudio } from "./useAudio";
+import SpeakingSection from "@/components/speaking/SpeakingSection";
+import { syncResult } from "@/lib/resultSync";
 
 const MAX_ITEMS = 15;
 const TOTAL_STOPS = 18; // 15 tap items + speaking + finish framing
@@ -126,7 +126,7 @@ export default function Session() {
   }
 
   if (phase === "speaking") {
-    return <MockSpeakingSection onDone={finish} />;
+    return <SpeakingSection onDone={finish} targetText="The dog runs." language="en" />;
   }
 
   if (phase === "celebration") {
