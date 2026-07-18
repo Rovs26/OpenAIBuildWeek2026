@@ -1,12 +1,14 @@
 import type { SessionResult, LevelBand, ItemResponse } from "@/lib/types";
-import { listResults } from "@/lib/store";
+import { headers } from "next/headers";
 import ClipPlayer from "./ClipPlayer";
 
 // Parent result card. Filipino-first, English subtitles. Warm, mobile-width,
 // screenshot-worthy. No theta / raw numbers except the speaking %.
 //
-// Reads the newest in-process result. When no assessment has arrived yet, the
-// seeded fallback keeps the page always renderable for the demo.
+// Reads the newest result through the API. The parent renderer and route
+// handler can be isolated by Next.js in production, so they cannot share an
+// in-memory store directly. When the API is empty or unavailable, the seeded
+// fallback keeps the page always renderable for the demo.
 
 export const dynamic = "force-dynamic";
 
@@ -227,8 +229,28 @@ function weakestFormat(responses: ItemResponse[]): Format {
   return worst;
 }
 
+async function fetchNewest(): Promise<SessionResult> {
+  try {
+    const requestHeaders = await headers();
+    const host =
+      requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host");
+    if (!host) return SEED;
+
+    const protocol = requestHeaders.get("x-forwarded-proto") ?? "http";
+    const response = await fetch(`${protocol}://${host}/api/results`, {
+      cache: "no-store",
+    });
+    if (!response.ok) return SEED;
+
+    const results = (await response.json()) as SessionResult[];
+    return results[0] ?? SEED;
+  } catch {
+    return SEED;
+  }
+}
+
 export default async function ParentPage() {
-  const result = listResults()[0] ?? SEED;
+  const result = await fetchNewest();
   const band = BAND_COPY[result.levelBand] ?? BAND_COPY.Beginning;
   const weak = weakestFormat(result.responses);
   const advice =
